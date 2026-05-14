@@ -16,6 +16,13 @@ class ServerConfig:
     auth_key: str | None = None
     ssl_certfile: str | None = None
     ssl_keyfile: str | None = None
+    # When True (and transport is streamable-http) FastMCP is run with
+    # stateless_http=True: no Mcp-Session-Id header is issued and the
+    # server does not maintain per-connection session state. Useful for
+    # resilience against server restarts (a reconnecting client is not
+    # rejected with "Session not found") and for horizontal scaling
+    # behind a load balancer.
+    stateless_http: bool = False
 
 
 @dataclass
@@ -107,6 +114,10 @@ def load_config(path: Path | None) -> WindowsMCPConfig:
         raw = str(server["ssl_keyfile"]) or None
         if raw:
             cfg.server.ssl_keyfile = str((path.parent / raw).resolve())
+    if "stateless_http" in server:
+        cfg.server.stateless_http = _strict_bool(
+            server["stateless_http"], "server.stateless_http"
+        )
 
     if "ip_allowlist" in security:
         cfg.security.ip_allowlist = _list_of_strings(security["ip_allowlist"], "security.ip_allowlist")
@@ -144,6 +155,8 @@ def write_config(cfg: WindowsMCPConfig, path: Path) -> None:
         server_lines.append(f'ssl_certfile = "{sd.ssl_certfile}"')
     if sd.ssl_keyfile:
         server_lines.append(f'ssl_keyfile = "{sd.ssl_keyfile}"')
+    if sd.stateless_http:
+        server_lines.append('stateless_http = true')
     if server_lines:
         lines += ['[server]'] + server_lines + ['']
 

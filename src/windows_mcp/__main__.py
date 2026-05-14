@@ -242,6 +242,7 @@ def _run_server(
     oauth_validator=None,
     cors_origins: list[str] | None = None,
     allowed_hosts: list[str] | None = None,
+    stateless_http: bool = False,
 ) -> None:
     mcp = _build_mcp()
     if explicit_tools or exclude_tools:
@@ -267,6 +268,7 @@ def _run_server(
                     allowed_hosts=allowed_hosts,
                 ),
                 uvicorn_config=uvicorn_config or None,
+                stateless_http=stateless_http,
             )
         case _:
             raise ValueError(f"Invalid transport: {transport}")
@@ -394,7 +396,15 @@ def main():
     type=str,
     show_default=False,
 )
-def serve(ctx, transport, host, port, debug, config, auth_key, allow_insecure_remote, ip_allowlist, tools, exclude_tools, cors_origins, ssl_certfile, ssl_keyfile, oauth_client_id, oauth_client_secret):
+@click.option(
+    "--stateless-http",
+    help="Run the streamable-http transport in stateless mode (no Mcp-Session-Id header). Lets reconnecting clients survive a server restart without re-handshaking, and removes the per-connection state that prevents horizontal scaling. Has no effect on stdio/sse transports.",
+    is_flag=True,
+    default=False,
+    envvar="WINDOWS_MCP_STATELESS_HTTP",
+    show_default=True,
+)
+def serve(ctx, transport, host, port, debug, config, auth_key, allow_insecure_remote, ip_allowlist, tools, exclude_tools, cors_origins, ssl_certfile, ssl_keyfile, oauth_client_id, oauth_client_secret, stateless_http):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     if transport == Transport.STDIO.value:
         os.environ.setdefault("NO_COLOR", "1")
@@ -415,6 +425,9 @@ def serve(ctx, transport, host, port, debug, config, auth_key, allow_insecure_re
     host = _choose_value(ctx, "host", host, cfg.server.host, "localhost")
     port = int(_choose_value(ctx, "port", port, cfg.server.port, 8000))
     auth_key = _choose_value(ctx, "auth_key", auth_key, cfg.server.auth_key, None)
+    stateless_http = bool(
+        _choose_value(ctx, "stateless_http", stateless_http, cfg.server.stateless_http, False)
+    )
     allow_insecure_remote = bool(
         _choose_value(ctx, "allow_insecure_remote", allow_insecure_remote, cfg.server.allow_insecure_remote, False)
     )
@@ -517,6 +530,7 @@ def serve(ctx, transport, host, port, debug, config, auth_key, allow_insecure_re
             oauth_validator=oauth_validator,
             cors_origins=cli_cors or None,
             allowed_hosts=computed_allowed_hosts,
+            stateless_http=stateless_http,
         )
         logger.debug("Server shut down normally")
     except Exception:
