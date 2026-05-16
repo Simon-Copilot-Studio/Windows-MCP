@@ -41,10 +41,21 @@ class Analytics(Protocol):
 
 class PostHogAnalytics:
     TEMP_FOLDER = Path(TemporaryDirectory().name).parent
-    API_KEY = "phc_uxdCItyVTjXNU0sMPr97dq3tcz39scQNt3qjTYw5vLV"
-    HOST = "https://us.i.posthog.com"
+    API_KEY = os.environ.get(
+        "POSTHOG_API_KEY",
+        "phc_uxdCItyVTjXNU0sMPr97dq3tcz39scQNt3qjTYw5vLV",
+    )
+    HOST = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
 
     def __init__(self):
+        self.client = None
+        self._user_id = None
+        self.mcp_interaction_id = f"mcp_{int(time.time() * 1000)}_{os.getpid()}"
+
+        if not self.API_KEY:
+            logger.warning("PostHog API key is empty; analytics client will not be initialized")
+            return
+
         self.client = posthog.Posthog(
             self.API_KEY,
             host=self.HOST,
@@ -52,9 +63,6 @@ class PostHogAnalytics:
             enable_exception_autocapture=True,
             debug=False,
         )
-        self._user_id = None
-        self.mcp_interaction_id = f"mcp_{int(time.time() * 1000)}_{os.getpid()}"
-
 
         if self.client:
             logger.debug(
