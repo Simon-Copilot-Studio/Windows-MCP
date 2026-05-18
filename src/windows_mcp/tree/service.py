@@ -4,6 +4,7 @@ from windows_mcp.tree.config import INTERACTIVE_CONTROL_TYPE_NAMES, DOCUMENT_CON
 from windows_mcp.tree.views import TreeElementNode, ScrollElementNode, TextElementNode, Center, BoundingBox, TreeState, SemanticNode, _prune_structural, _reverse_children_order
 from windows_mcp.tree.cache_utils import CacheRequestFactory, CachedControlHelper
 from windows_mcp.tree.utils import random_point_within_bounding_box
+from windows_mcp.tree import ia2 as ia2_traversal
 from typing import TYPE_CHECKING,Optional,Any
 from time import sleep,perf_counter
 import logging
@@ -46,6 +47,7 @@ class Tree:
         self.screen_size=desktop.get_screen_size()
         self.dom:Optional[Control]=None
         self.dom_bounding_box:BoundingBox=None
+        self.dom_is_ia2:bool=False
         self.screen_box=BoundingBox(
             top=0, left=0, bottom=self.screen_size.height, right=self.screen_size.width,
             width=self.screen_size.width, height=self.screen_size.height
@@ -57,6 +59,7 @@ class Tree:
         # Reset DOM state to prevent leaks and stale data
         self.dom = None
         self.dom_bounding_box = None
+        self.dom_is_ia2 = False
         start_time = perf_counter()
         profile_enabled = _snapshot_profile_enabled()
 
@@ -97,6 +100,24 @@ class Tree:
             except Exception as e:
                 logger.debug(f"Failed to get DOM scroll pattern: {e}")
                 dom_node=None
+        elif self.dom_is_ia2 and self.dom_bounding_box is not None:
+            # Firefox / IA2 path — no UIA scroll pattern, so emit a stub ScrollElementNode
+            # with scrolling disabled. Downstream consumers (Scrape) only need a truthy
+            # dom_node and the bounding box.
+            dom_node=ScrollElementNode(**{
+                'name':'DOM',
+                'control_type':'DocumentControl',
+                'bounding_box':self.dom_bounding_box,
+                'center':self.dom_bounding_box.get_center(),
+                'window_name':'DOM',
+                'metadata':{
+                    'has_focused': False,
+                    'horizontal_scrollable': False,
+                    'horizontal_scroll_percent': 0,
+                    'vertical_scrollable': False,
+                    'vertical_scroll_percent': 0,
+                }
+            })
         else:
             dom_node=None
         # Build semantic tree: desktop → windows → structural/interactive/scrollable
@@ -727,6 +748,46 @@ class Tree:
                 )
 
             self.tree_traversal(node, window_bounding_box, window_name, is_browser, interactive_nodes, scrollable_nodes, dom_interactive_nodes, dom_informative_nodes, is_dom=False, is_dialog=False, element_cache_req=element_cache_req, children_cache_req=children_cache_req, current_semantic_node=window_sem_node)
+
+            # IA2 fallback: Firefox doesn't expose RootWebArea via UIA, so the traversal
+            # above finds no DOM content. If this is a browser window and UIA gave us no
+            # DOM, walk the IAccessible tree (MSAA / IA2) instead.
+            if is_browser and use_dom and self.dom is None:
+                try:
+                    window_box = BoundingBox(
+                        left=window_bounding_box.left,
+                        top=window_bounding_box.top,
+                        right=window_bounding_box.right,
+                        bottom=window_bounding_box.bottom,
+                        width=window_bounding_box.width(),
+                        height=window_bounding_box.height(),
+                    )
+                    ia2_t0 = perf_counter()
+                    ia2_result = ia2_traversal.traverse_window(
+                        hwnd=handle,
+                        window_name=window_name,
+                        window_bounding_box=window_box,
+                    )
+                    ia2_ms = (perf_counter() - ia2_t0) * 1000
+                    if ia2_result:
+                        dom_interactive_nodes.extend(ia2_result.interactive_nodes)
+                        dom_informative_nodes.extend(ia2_result.informative_nodes)
+                        # Pin the bbox to the FIRST Firefox window walked (the active
+                        # one — it's first in windows_handles). Subsequent windows
+                        # contribute nodes but mustn't clobber the active window's bbox.
+                        if not self.dom_is_ia2:
+                            self.dom_bounding_box = ia2_result.dom_bounding_box or window_box
+                            self.dom_is_ia2 = True
+                        logger.info(
+                            "IA2 fallback for '%s' produced %d interactive / %d informative nodes in %.1fms",
+                            window_name,
+                            len(ia2_result.interactive_nodes),
+                            len(ia2_result.informative_nodes),
+                            ia2_ms,
+                        )
+                except Exception as e:
+                    logger.warning("IA2 fallback failed for '%s' (handle %#x): %s", window_name, handle, e)
+
             logger.debug(f'Window name:{window_name}')
             logger.debug(f'Interactive nodes:{len(interactive_nodes)}')
             if is_browser:
