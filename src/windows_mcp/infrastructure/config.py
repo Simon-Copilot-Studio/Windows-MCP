@@ -75,6 +75,21 @@ def _strict_bool(raw: object, key: str) -> bool:
     raise ValueError(f"{key} must be a TOML boolean, not {type(raw).__name__}")
 
 
+def _strict_string(raw: object, key: str) -> str:
+    if isinstance(raw, str):
+        return raw
+    raise ValueError(f"{key} must be a TOML string, not {type(raw).__name__}")
+
+
+def _strict_int(raw: object, key: str) -> int:
+    # TOML booleans are a subclass of int; reject them explicitly.
+    if isinstance(raw, bool):
+        raise ValueError(f"{key} must be a TOML integer, not bool")
+    if isinstance(raw, int):
+        return raw
+    raise ValueError(f"{key} must be a TOML integer, not {type(raw).__name__}")
+
+
 def load_config(path: Path | None) -> WindowsMCPConfig:
     """Load and validate TOML config file. Returns defaults when path is None."""
     cfg = WindowsMCPConfig()
@@ -92,41 +107,49 @@ def load_config(path: Path | None) -> WindowsMCPConfig:
 
     _VALID_TRANSPORTS = {"stdio", "sse", "streamable-http"}
     if "transport" in server:
-        t = str(server["transport"])
+        t = _strict_string(server["transport"], "server.transport")
         if t not in _VALID_TRANSPORTS:
             raise ValueError(f"server.transport must be one of {_VALID_TRANSPORTS}, got {t!r}")
         cfg.server.transport = t
     if "host" in server:
-        cfg.server.host = str(server["host"])
+        cfg.server.host = _strict_string(server["host"], "server.host")
     if "port" in server:
-        cfg.server.port = int(server["port"])
+        cfg.server.port = _strict_int(server["port"], "server.port")
+        if not 0 <= cfg.server.port <= 65535:
+            raise ValueError("server.port must be between 0 and 65535")
     if "allow_insecure_remote" in server:
         cfg.server.allow_insecure_remote = _strict_bool(
             server["allow_insecure_remote"], "server.allow_insecure_remote"
         )
     if "auth_key" in server:
-        cfg.server.auth_key = str(server["auth_key"]) or None
+        cfg.server.auth_key = _strict_string(server["auth_key"], "server.auth_key") or None
     if "ssl_certfile" in server:
-        raw = str(server["ssl_certfile"]) or None
+        raw = _strict_string(server["ssl_certfile"], "server.ssl_certfile") or None
         if raw:
             cfg.server.ssl_certfile = str((path.parent / raw).resolve())
     if "ssl_keyfile" in server:
-        raw = str(server["ssl_keyfile"]) or None
+        raw = _strict_string(server["ssl_keyfile"], "server.ssl_keyfile") or None
         if raw:
             cfg.server.ssl_keyfile = str((path.parent / raw).resolve())
     if "stateless_http" in server:
-        cfg.server.stateless_http = _strict_bool(
-            server["stateless_http"], "server.stateless_http"
-        )
+        cfg.server.stateless_http = _strict_bool(server["stateless_http"], "server.stateless_http")
 
     if "ip_allowlist" in security:
-        cfg.security.ip_allowlist = _list_of_strings(security["ip_allowlist"], "security.ip_allowlist")
+        cfg.security.ip_allowlist = _list_of_strings(
+            security["ip_allowlist"], "security.ip_allowlist"
+        )
     if "cors_origins" in security:
-        cfg.security.cors_origins = _list_of_strings(security["cors_origins"], "security.cors_origins")
+        cfg.security.cors_origins = _list_of_strings(
+            security["cors_origins"], "security.cors_origins"
+        )
     if "oauth_client_id" in security:
-        cfg.security.oauth_client_id = str(security["oauth_client_id"]) or None
+        cfg.security.oauth_client_id = (
+            _strict_string(security["oauth_client_id"], "security.oauth_client_id") or None
+        )
     if "oauth_client_secret" in security:
-        cfg.security.oauth_client_secret = str(security["oauth_client_secret"]) or None
+        cfg.security.oauth_client_secret = (
+            _strict_string(security["oauth_client_secret"], "security.oauth_client_secret") or None
+        )
 
     if "exclude" in tools:
         cfg.tools.exclude = _list_of_strings(tools["exclude"], "tools.exclude")
@@ -146,9 +169,9 @@ def write_config(cfg: WindowsMCPConfig, path: Path) -> None:
     if sd.host != dd.host:
         server_lines.append(f'host = "{sd.host}"')
     if sd.port != dd.port:
-        server_lines.append(f'port = {sd.port}')
+        server_lines.append(f"port = {sd.port}")
     if sd.allow_insecure_remote:
-        server_lines.append('allow_insecure_remote = true')
+        server_lines.append("allow_insecure_remote = true")
     if sd.auth_key:
         server_lines.append(f'auth_key = "{sd.auth_key}"')
     if sd.ssl_certfile:
@@ -156,27 +179,27 @@ def write_config(cfg: WindowsMCPConfig, path: Path) -> None:
     if sd.ssl_keyfile:
         server_lines.append(f'ssl_keyfile = "{sd.ssl_keyfile}"')
     if sd.stateless_http:
-        server_lines.append('stateless_http = true')
+        server_lines.append("stateless_http = true")
     if server_lines:
-        lines += ['[server]'] + server_lines + ['']
+        lines += ["[server]"] + server_lines + [""]
 
     sec = cfg.security
     sec_lines: list[str] = []
     if sec.ip_allowlist:
-        items = ', '.join(f'"{ip}"' for ip in sec.ip_allowlist)
-        sec_lines.append(f'ip_allowlist = [{items}]')
+        items = ", ".join(f'"{ip}"' for ip in sec.ip_allowlist)
+        sec_lines.append(f"ip_allowlist = [{items}]")
     if sec.cors_origins:
-        items = ', '.join(f'"{o}"' for o in sec.cors_origins)
-        sec_lines.append(f'cors_origins = [{items}]')
+        items = ", ".join(f'"{o}"' for o in sec.cors_origins)
+        sec_lines.append(f"cors_origins = [{items}]")
     if sec.oauth_client_id:
         sec_lines.append(f'oauth_client_id = "{sec.oauth_client_id}"')
     if sec.oauth_client_secret:
         sec_lines.append(f'oauth_client_secret = "{sec.oauth_client_secret}"')
     if sec_lines:
-        lines += ['[security]'] + sec_lines + ['']
+        lines += ["[security]"] + sec_lines + [""]
 
     if cfg.tools.exclude:
-        items = ', '.join(f'"{t}"' for t in cfg.tools.exclude)
-        lines += ['[tools]', f'exclude = [{items}]', '']
+        items = ", ".join(f'"{t}"' for t in cfg.tools.exclude)
+        lines += ["[tools]", f"exclude = [{items}]", ""]
 
-    path.write_text('\n'.join(lines), encoding='utf-8')
+    path.write_text("\n".join(lines), encoding="utf-8")
