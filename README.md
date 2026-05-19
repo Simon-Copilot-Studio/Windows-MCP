@@ -82,9 +82,9 @@ mcp-name: io.github.CursorTouch/Windows-MCP
 Run the server directly when needed:
 
 ```shell
-uvx windows-mcp
-uvx windows-mcp --transport sse --host localhost --port 8000
-uvx windows-mcp --transport streamable-http --host localhost --port 8000
+uvx windows-mcp serve
+uvx windows-mcp serve --transport sse --host localhost --port 8000
+uvx windows-mcp serve --transport streamable-http --host localhost --port 8000
 ```
 
 Install it as a background task that starts now and at every login:
@@ -103,14 +103,13 @@ to `~/.windows-mcp/server.log` and `~/.windows-mcp/server.error.log`.
 <details>
   <summary>Install in Claude Desktop</summary>
 
-  1. Install [Claude Desktop](https://claude.ai/download) and
+  1. Install [Claude Desktop](https://claude.ai/download).
 
 ```shell
 npm install -g @anthropic-ai/mcpb
 ```
 
-
-  2. Configure the extension:
+  2. Configure the MCP server.
 
   **Option A: Install from PyPI (Recommended)**
   
@@ -123,7 +122,8 @@ npm install -g @anthropic-ai/mcpb
       "windows-mcp": {
         "command": "uvx",
         "args": [
-          "windows-mcp"
+          "windows-mcp",
+          "serve"
         ]
       }
     }
@@ -148,19 +148,14 @@ npm install -g @anthropic-ai/mcpb
           "--directory",
           "<path to the windows-mcp directory>",
           "run",
-          "windows-mcp"
+          "windows-mcp",
+          "serve"
         ]
       }
     }
   }
   ```
-
-
-
-  3. Open Claude Desktop and enjoy! 🥳
-
-
-  5. Enjoy 🥳.
+  3. Fully restart Claude Desktop and verify the server appears in the MCP tools list.
 
   **Claude Desktop MSIX (Windows Store)**
 
@@ -173,14 +168,15 @@ npm install -g @anthropic-ai/mcpb
   You must manually edit the configuration file. Note that Electron apps in the MSIX sandbox do not inherit the system `PATH`, so you must use the **full absolute path** to `uvx.exe` (or `uv.exe`).
 
   **Option A: Using pre-installed executable**
-  1. In a terminal, run: `uv tool install windows-mcp`
+
+  1. In a terminal, run `uv tool install windows-mcp`.
   2. Use the generated executable in your config:
   ```json
   {
     "mcpServers": {
       "windows-mcp": {
         "command": "C:\\Users\\<user>\\.local\\bin\\windows-mcp.exe",
-        "args": []
+        "args": ["serve"]
       }
     }
   }
@@ -192,7 +188,7 @@ npm install -g @anthropic-ai/mcpb
     "mcpServers": {
       "windows-mcp": {
         "command": "C:\\Users\\<user>\\.local\\bin\\uvx.exe",
-        "args": ["windows-mcp"]
+        "args": ["windows-mcp", "serve"]
       }
     }
   }
@@ -208,7 +204,8 @@ npm install -g @anthropic-ai/mcpb
           "--directory",
           "C:\\path\\to\\Windows-MCP",
           "run",
-          "windows-mcp"
+          "windows-mcp",
+          "serve"
         ]
       }
     }
@@ -223,21 +220,9 @@ npm install -g @anthropic-ai/mcpb
 <details>
   <summary>Install in Perplexity Desktop</summary>
 
-  1. Install [Perplexity Desktop](https://apps.microsoft.com/detail/xp8jnqfbqh6pvf):
-
-  2. Clone the repository.
-
-```shell
-git clone https://github.com/CursorTouch/Windows-MCP.git
-
-cd Windows-MCP
-```
-  
-  3. Open Perplexity Desktop:
-
-Go to `Settings->Connectors->Add Connector->Advanced`
-
-  4. Enter the name as `Windows-MCP`, then paste the following JSON in the text area.
+  1. Install [Perplexity Desktop](https://apps.microsoft.com/detail/xp8jnqfbqh6pvf).
+  2. Open Perplexity Desktop and go to `Settings -> Connectors -> Add Connector -> Advanced`.
+  3. Enter the name as `Windows-MCP`, then paste one of the following configs.
 
 
   **Option A: Install from PyPI (Recommended)**
@@ -246,7 +231,8 @@ Go to `Settings->Connectors->Add Connector->Advanced`
   {
     "command": "uvx",
     "args": [
-      "windows-mcp"
+      "windows-mcp",
+      "serve"
     ]
   }
   ```
@@ -260,13 +246,13 @@ Go to `Settings->Connectors->Add Connector->Advanced`
       "--directory",
       "<path to the windows-mcp directory>",
       "run",
-      "windows-mcp"
+      "windows-mcp",
+      "serve"
     ]
   }
   ```
 
-
-5. Click `Save` and Enjoy 🥳.
+  4. Click `Save`, then restart Perplexity Desktop if needed.
 
 For additional Claude Desktop integration troubleshooting, see the [Perplexity MCP Support](https://www.perplexity.ai/help-center/en/articles/11502712-local-and-remote-mcps-for-perplexity). The documentation includes helpful tips for checking logs and resolving common issues.
 </details>
@@ -274,19 +260,14 @@ For additional Claude Desktop integration troubleshooting, see the [Perplexity M
 <details>
   <summary> Install in Gemini CLI</summary>
 
-  1. Install Gemini CLI:
+  1. Install Gemini CLI.
 
 ```shell
 npm install -g @google/gemini-cli
 ```
 
-
-  2. Configure the server in `%USERPROFILE%/.gemini/settings.json`:
-
-
-  3. Navigate to `%USERPROFILE%/.gemini` in File Explorer and open `settings.json`.
-
-  4. Add the `windows-mcp` config in the `settings.json` and save it.
+  2. Open `%USERPROFILE%/.gemini/settings.json`.
+  3. Add the `windows-mcp` config and save it.
 
 ```json
 {
@@ -296,32 +277,27 @@ npm install -g @google/gemini-cli
     "windows-mcp": {
       "command": "uvx",
       "args": [
-        "windows-mcp"
+        "windows-mcp",
+        "serve"
       ]
     }
   }
 }
 ```
-*Note: To run from source, replace the command with `uv` and args with `["--directory", "<path>", "run", "windows-mcp"]`.*
+*Note: To run from source, replace the command with `uv` and args with `["--directory", "<path>", "run", "windows-mcp", "serve"]`.*
 
-
-  5. Rerun Gemini CLI in terminal. Enjoy 🥳
+  4. Restart Gemini CLI.
 </details>
 
 <details>
   <summary>Install in Qwen Code</summary>
-  1. Install Qwen Code:
+  1. Install Qwen Code.
 
 ```shell
 npm install -g @qwen-code/qwen-code@latest
 ```
-
-   2. Configure the server in `%USERPROFILE%/.qwen/settings.json`:
-
-
-  3. Navigate to `%USERPROFILE%/.qwen/settings.json`.
-
-  4. Add the `windows-mcp` config in the `settings.json` and save it.
+  2. Open `%USERPROFILE%/.qwen/settings.json`.
+  3. Add the `windows-mcp` config and save it.
 
 ```json
 {
@@ -329,43 +305,39 @@ npm install -g @qwen-code/qwen-code@latest
     "windows-mcp": {
       "command": "uvx",
       "args": [
-        "windows-mcp"
+        "windows-mcp",
+        "serve"
       ]
     }
   }
 }
 ```
-*Note: To run from source, replace the command with `uv` and args with `["--directory", "<path>", "run", "windows-mcp"]`.*
+*Note: To run from source, replace the command with `uv` and args with `["--directory", "<path>", "run", "windows-mcp", "serve"]`.*
 
-
-  5. Rerun Qwen Code in terminal. Enjoy 🥳
+  4. Restart Qwen Code.
 </details>
 
 <details>
   <summary>Install in Codex CLI</summary>
-  1. Install Codex CLI:
+  1. Install Codex CLI.
 
 ```shell
 npm install -g @openai/codex
 ```
-
-  2. Configure the server in `%USERPROFILE%/.codex/config.toml`:
-
-  3. Navigate to `%USERPROFILE%/.codex/config.toml`.
-
-  4. Add the `windows-mcp` config in the `config.toml` and save it.
+  2. Open `%USERPROFILE%/.codex/config.toml`.
+  3. Add the `windows-mcp` config and save it.
 
 ```toml
 [mcp_servers.windows-mcp]
 command="uvx"
 args=[
-  "windows-mcp"
+  "windows-mcp",
+  "serve"
 ]
 ```
-*Note: To run from source, replace the command with `uv` and args with `["--directory", "<path>", "run", "windows-mcp"]`.*
+*Note: To run from source, replace the command with `uv` and args with `["--directory", "<path>", "run", "windows-mcp", "serve"]`.*
 
-
-  5. Rerun Codex CLI in terminal. Enjoy 🥳
+  4. Restart Codex CLI.
 </details>
 
 <details>
@@ -384,7 +356,7 @@ npm install -g @anthropic-ai/claude-code
   Use `uvx` to run the latest version directly from PyPI.
 
   ```shell
-  claude mcp add --transport stdio windows-mcp -- uvx windows-mcp
+  claude mcp add --transport stdio windows-mcp -- uvx windows-mcp serve
   ```
 
   **Option B: Install from Source**
@@ -397,7 +369,7 @@ npm install -g @anthropic-ai/claude-code
 
   2. Run the following command in your terminal:
   ```shell
-  claude mcp add --transport stdio windows-mcp -- uv --directory "<path>" run windows-mcp
+  claude mcp add --transport stdio windows-mcp -- uv --directory "<path>" run windows-mcp serve
   ```
 
   *Note: To make the server available across all projects, add `--scope user` to the command.*
@@ -407,7 +379,7 @@ npm install -g @anthropic-ai/claude-code
   **Note:** On Windows, if you encounter "Connection closed" errors, use the full path to `uvx.exe`:
 
   ```shell
-  claude mcp add --transport stdio windows-mcp -- C:\Users\<user>\.local\bin\uvx.exe windows-mcp
+  claude mcp add --transport stdio windows-mcp -- C:\Users\<user>\.local\bin\uvx.exe windows-mcp serve
   ```
 
   To verify the server is registered, run `claude mcp list`. Inside Claude Code, use `/mcp` to check server status.
@@ -423,7 +395,7 @@ npm install -g @anthropic-ai/claude-code
 
   2. From your **WSL terminal**, register the server:
   ```shell
-  claude mcp add windows-mcp --transport stdio -s user -- powershell.exe -Command "C:\Users\<user>\.local\bin\uvx.exe windows-mcp"
+  claude mcp add windows-mcp --transport stdio -s user -- powershell.exe -Command "C:\Users\<user>\.local\bin\uvx.exe windows-mcp serve"
   ```
 
   Replace `<user>` with your Windows username. The `-s user` flag makes the server available across all projects.
@@ -439,11 +411,11 @@ Windows-MCP runs directly on your Windows machine and exposes its tools to the c
 
 ```shell
 # Runs with stdio transport (default)
-uvx windows-mcp
+uvx windows-mcp serve
 
 # Or with SSE/Streamable HTTP for network access
-uvx windows-mcp --transport sse --host localhost --port 8000
-uvx windows-mcp --transport streamable-http --host localhost --port 8000
+uvx windows-mcp serve --transport sse --host localhost --port 8000
+uvx windows-mcp serve --transport streamable-http --host localhost --port 8000
 ```
 
 Optional environment variables can be set to customize behavior — see [Environment Variables](#-environment-variables) below.
@@ -453,7 +425,7 @@ Optional environment variables can be set to customize behavior — see [Environ
 For network access, enable authentication and TLS:
 
 ```shell
-windows-mcp --transport sse --host 0.0.0.0 \
+windows-mcp serve --transport sse --host 0.0.0.0 \
   --auth-key "your_secret_token" \
   --ip-allowlist "203.0.113.0/24" \
   --ssl-certfile cert.pem --ssl-keyfile key.pem
@@ -465,9 +437,9 @@ See [🔐 Security & Access Control](#-security--access-control) for all options
 
 | Transport | Flag | Use Case |
 |---|---|---|
-| `stdio` (default) | `--transport stdio` | Direct connection from MCP clients like Claude Desktop, Cursor, etc. |
-| `sse` | `--transport sse --host HOST --port PORT` | Network-accessible via Server-Sent Events |
-| `streamable-http` | `--transport streamable-http --host HOST --port PORT` | Network-accessible via HTTP streaming (recommended for production) |
+| `stdio` (default) | `serve --transport stdio` | Direct connection from MCP clients like Claude Desktop, Cursor, etc. |
+| `sse` | `serve --transport sse --host HOST --port PORT` | Network-accessible via Server-Sent Events |
+| `streamable-http` | `serve --transport streamable-http --host HOST --port PORT` | Network-accessible via HTTP streaming (recommended for production) |
 
 ---
 
@@ -475,13 +447,13 @@ See [🔐 Security & Access Control](#-security--access-control) for all options
 
 ### Authentication
 ```shell
-windows-mcp --transport sse --host 0.0.0.0 --auth-key "your_token"
+windows-mcp serve --transport sse --host 0.0.0.0 --auth-key "your_token"
 ```
 Requires `Authorization: Bearer your_token` header on all requests.
 
 ### IP Allowlist
 ```shell
-windows-mcp --auth-key "token" --ip-allowlist "203.0.113.0/24,198.51.100.5"
+windows-mcp serve --auth-key "token" --ip-allowlist "203.0.113.0/24,198.51.100.5"
 ```
 Restricts connections to specified CIDR ranges. Blocks private/loopback IPs by default.
 
@@ -492,7 +464,7 @@ By default, **no CORS headers are emitted**. Browsers block cross-origin request
 If you need a browser-based MCP client to reach the server, opt in with an explicit origin allowlist:
 
 ```shell
-windows-mcp --cors-origins "https://my-client.example.com,https://other.example.com"
+windows-mcp serve --cors-origins "https://my-client.example.com,https://other.example.com"
 ```
 
 Only the listed origins receive `Access-Control-Allow-Origin` headers; all other cross-origin requests are rejected by the browser. The equivalent environment variable is `WINDOWS_MCP_CORS_ORIGINS`.
@@ -501,15 +473,15 @@ Only the listed origins receive `Access-Control-Allow-Origin` headers; all other
 All tools are enabled by default. Use `--tools` to whitelist specific tools, or `--exclude-tools` to block specific ones.
 
 ```shell
-windows-mcp --tools "Screenshot,Click,Snapshot"   # Enable only these tools
-windows-mcp --exclude-tools "PowerShell,Registry" # Disable specific tools
+windows-mcp serve --tools "Screenshot,Click,Snapshot"   # Enable only these tools
+windows-mcp serve --exclude-tools "PowerShell,Registry" # Disable specific tools
 ```
 
 ### TLS/HTTPS
 ```shell
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
 
-windows-mcp --ssl-certfile cert.pem --ssl-keyfile key.pem
+windows-mcp serve --ssl-certfile cert.pem --ssl-keyfile key.pem
 ```
 
 ### OAuth 2.0 + PKCE
@@ -517,7 +489,7 @@ windows-mcp --ssl-certfile cert.pem --ssl-keyfile key.pem
 For MCP clients that use OAuth (e.g. Claude Desktop) instead of a static API key:
 
 ```shell
-windows-mcp --transport streamable-http --host 0.0.0.0 \
+windows-mcp serve --transport streamable-http --host 0.0.0.0 \
   --ssl-certfile ~/.windows-mcp/cert.pem \
   --ssl-keyfile  ~/.windows-mcp/key.pem \
   --oauth-client-id my-client \
@@ -614,6 +586,22 @@ openssl req -x509 -newkey rsa:4096 \
   -days 365 -nodes
 ```
 
+### `auth` Helper
+
+Generate an auth key and save a working config to `~/.windows-mcp/config.toml`:
+
+```shell
+windows-mcp auth
+```
+
+Generate auth plus a self-signed TLS certificate:
+
+```shell
+windows-mcp auth --transport streamable-http --host 0.0.0.0 --port 8000 --with-tls
+```
+
+This command writes the auth key into the config file, can generate `cert.pem` and `key.pem`, and prints an example MCP client configuration for the selected transport.
+
 ### SSRF Protection
 `Scrape` tool blocks: private IPs, loopback, link-local, credentials-in-URLs, non-HTTP schemes.
 
@@ -643,6 +631,9 @@ All variables are optional unless noted. Set them via the `env` key in `claude_d
 | `WINDOWS_MCP_EXCLUDE_TOOLS` | _(none)_ | Comma-separated list of tools to disable (e.g., `PowerShell,Registry`). Alternative to `--exclude-tools` CLI flag. |
 | `WINDOWS_MCP_SSL_CERTFILE` | _(none)_ | Path to TLS certificate file (.pem) for HTTPS. Must be provided with `WINDOWS_MCP_SSL_KEYFILE`. |
 | `WINDOWS_MCP_SSL_KEYFILE` | _(none)_ | Path to TLS private key file (.pem) for HTTPS. Must be provided with `WINDOWS_MCP_SSL_CERTFILE`. |
+| `WINDOWS_MCP_OAUTH_CLIENT_ID` | _(none)_ | OAuth client ID for HTTP transports. Must be provided with `WINDOWS_MCP_OAUTH_CLIENT_SECRET`. |
+| `WINDOWS_MCP_OAUTH_CLIENT_SECRET` | _(none)_ | OAuth client secret for HTTP transports. Must be provided with `WINDOWS_MCP_OAUTH_CLIENT_ID`. |
+| `WINDOWS_MCP_STATELESS_HTTP` | `false` | Set to `1`, `true`, `yes`, or `on` to run `streamable-http` without `Mcp-Session-Id` connection state. Useful for reconnects after restarts and for horizontally scaled deployments. |
 
 ### Telemetry
 
@@ -666,7 +657,7 @@ Local (no security):
   "mcpServers": {
     "windows-mcp": {
       "command": "uvx",
-      "args": ["windows-mcp"],
+      "args": ["windows-mcp", "serve"],
       "env": { "WINDOWS_MCP_SCREENSHOT_SCALE": "0.5" }
     }
   }
@@ -679,7 +670,7 @@ Remote (with auth + IP allowlist + TLS):
   "mcpServers": {
     "windows-mcp": {
       "command": "uvx",
-      "args": ["windows-mcp", "--transport", "sse", "--host", "0.0.0.0"],
+      "args": ["windows-mcp", "serve", "--transport", "sse", "--host", "0.0.0.0"],
       "env": {
         "WINDOWS_MCP_AUTH_KEY": "your_token",
         "WINDOWS_MCP_IP_ALLOWLIST": "203.0.113.0/24",
@@ -706,7 +697,8 @@ MCP Client can access the following tools to interact with Windows:
 - `Screenshot`: Fast screenshot-first desktop capture with cursor position, active/open windows, and an image. Skips UI tree extraction for speed and should be the default first call when you mainly need visual context. Supports `display=[0]` or `display=[0,1]` to capture specific screens. After capture, a brief orange-red glowing border is drawn over the captured area as a visual confirmation (set `WINDOWS_MCP_DISABLE_FLASH=1` to disable).
 - `Snapshot`: Full desktop state capture for workflows that need interactive element ids, scrollable regions, or `use_dom=True` browser extraction. Supports `use_vision=True` for including screenshots and `display=[0]` or `display=[0,1]` for limiting all returned Snapshot information to specific screens.
 - `App`: To launch an application from the start menu, resize or move the window and switch between apps.
-- `Shell`: To execute PowerShell commands.
+- `PowerShell`: To execute PowerShell commands.
+- `FileSystem`: Read, write, copy, move, delete, list, search, and inspect files and directories.
 - `Scrape`: To scrape the entire webpage for information.
 - `MultiSelect`: Select multiple items (files, folders, checkboxes) with optional Ctrl key. Uses bulk label-to-coordinate resolution when labels are provided.
 - `MultiEdit`: Enter text into multiple input fields at specified coordinates. Uses bulk label-to-coordinate resolution when labels are provided.
@@ -761,7 +753,8 @@ To disable telemetry, set `ANONYMIZED_TELEMETRY` to `false` in your MCP client c
     "windows-mcp": {
       "command": "uvx",
       "args": [
-        "windows-mcp"
+        "windows-mcp",
+        "serve"
       ],
       "env": {
         "ANONYMIZED_TELEMETRY": "false"
