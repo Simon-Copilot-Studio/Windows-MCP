@@ -404,7 +404,7 @@ class Tree:
                 if control_type_name in TEXT_CONTROL_TYPE_NAMES and not skip_text:
                     text = node.CachedName.strip()
                     if text and ordered_nodes is not None:
-                        ordered_nodes.append(TextElementNode(text=text, window_name=window_name))
+                        ordered_nodes.append(TextElementNode(text=text, window_name=window_name, is_dom=is_dom))
 
                 is_enabled = node.CachedIsEnabled
                 if is_enabled:
@@ -580,6 +580,7 @@ class Tree:
                                 })
                                 dom_interactive_nodes.append(tree_node)
                                 if ordered_nodes is not None:
+                                    tree_node.is_dom = True
                                     ordered_nodes.append(tree_node)
                                 self._dom_correction(node, dom_interactive_nodes, window_name)
                             else:
@@ -595,6 +596,7 @@ class Tree:
                                 })
                                 interactive_nodes.append(tree_node)
                                 if ordered_nodes is not None:
+                                    tree_node.is_dom = is_dom
                                     ordered_nodes.append(tree_node)
                                 if current_semantic_node is not None:
                                     current_semantic_node.add_child(SemanticNode(
@@ -810,9 +812,6 @@ class Tree:
             if not is_browser and window_sem_node is not None:
                 # tree_traversal visits reversed(children) for native apps — fix ordering now
                 _reverse_children_order(window_sem_node)
-                # Also reverse ordered_nodes since they were collected in reverse order
-                ordered_nodes.reverse()
-            elif is_browser:
                 # Build browser window semantic tree post-hoc from flat DOM lists
                 window_sem_node = SemanticNode(
                     control_type='Window',

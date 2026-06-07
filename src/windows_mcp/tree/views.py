@@ -185,8 +185,25 @@ class TreeState:
         if not self.ordered_nodes:
             return "No UI context"
         node_to_idx = {id(node): idx for idx, node in enumerate(self.interactive_nodes)}
-        lines = []
+
+        # Separate DOM and non-DOM elements
+        non_dom_nodes = []
+        dom_nodes = []
         for node in self.ordered_nodes:
+            if isinstance(node, TextElementNode):
+                if node.is_dom:
+                    dom_nodes.append(node)
+                else:
+                    non_dom_nodes.append(node)
+            else:
+                if node.is_dom:
+                    dom_nodes.append(node)
+                else:
+                    non_dom_nodes.append(node)
+
+        # Display non-DOM first, then DOM
+        lines = []
+        for node in non_dom_nodes:
             if isinstance(node, TextElementNode):
                 lines.append(f"[{node.text}]")
             else:
@@ -199,6 +216,21 @@ class TreeState:
                 action = _action_for(ctrl)
                 meta = _node_meta_str(node.metadata)
                 lines.append(f'{idx}|{coords}|{ctrl}|{name}|[action: {action}]{meta}')
+
+        for node in dom_nodes:
+            if isinstance(node, TextElementNode):
+                lines.append(f"[{node.text}]")
+            else:
+                idx = node_to_idx.get(id(node))
+                if not idx:
+                    continue
+                coords = node.center.to_string()
+                ctrl = node.control_type.lower()
+                name = node.name
+                action = _action_for(ctrl)
+                meta = _node_meta_str(node.metadata)
+                lines.append(f'{idx}|{coords}|{ctrl}|{name}|[action: {action}]{meta}')
+
         return "\n".join(lines)
 
 
@@ -255,6 +287,7 @@ class TreeElementNode:
     control_type: str = ""
     window_name: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+    is_dom: bool = False
 
     def update_from_node(self, node: "TreeElementNode"):
         self.name = node.name
@@ -279,6 +312,7 @@ class ScrollElementNode:
 class TextElementNode:
     text: str
     window_name: str = ""
+    is_dom: bool = False
 
 
 ElementNode = TreeElementNode | ScrollElementNode | TextElementNode
