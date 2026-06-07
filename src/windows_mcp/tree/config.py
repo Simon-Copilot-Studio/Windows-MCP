@@ -80,6 +80,23 @@ INFORMATIVE_CONTROL_TYPE_NAMES = set(
     ]
 )
 
+TEXT_CONTROL_TYPE_NAMES = set(["TextControl", "ImageControl"])
+
+TEXT_OWNING_CONTROL_TYPE_NAMES = set([
+    "ButtonControl",
+    "CheckBoxControl",
+    "RadioButtonControl",
+    "MenuItemControl",
+    "TabItemControl",
+    "HyperlinkControl",
+    "ComboBoxControl",
+    "EditControl",
+    "ListItemControl",
+    "HeaderItemControl",
+    "TreeItemControl",
+    "DataItemControl",
+])
+
 DEFAULT_ACTIONS = set(["Click", "Press", "Jump", "Check", "Uncheck", "Double Click"])
 
 THREAD_MAX_RETRIES = 3

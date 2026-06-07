@@ -160,6 +160,7 @@ class TreeState:
     interactive_nodes: list["TreeElementNode"] = field(default_factory=list)
     scrollable_nodes: list["ScrollElementNode"] = field(default_factory=list)
     dom_informative_nodes: list["TextElementNode"] = field(default_factory=list)
+    ordered_nodes: list["ElementNode"] = field(default_factory=list)
     capture_sec: float = 0.0
     semantic_tree_root: "SemanticNode | None" = None
 
@@ -179,6 +180,26 @@ class TreeState:
         if not self.scrollable_nodes:
             return "No scrollable elements"
         return _render_tree(self.scrollable_nodes, _scroll_meta_str)
+
+    def ui_context_to_string(self) -> str:
+        if not self.ordered_nodes:
+            return "No UI context"
+        node_to_idx = {id(node): idx for idx, node in enumerate(self.interactive_nodes)}
+        lines = []
+        for node in self.ordered_nodes:
+            if isinstance(node, TextElementNode):
+                lines.append(f"[{node.text}]")
+            else:
+                idx = node_to_idx.get(id(node))
+                if not idx:
+                    continue
+                coords = node.center.to_string()
+                ctrl = node.control_type.lower()
+                name = node.name
+                action = _action_for(ctrl)
+                meta = _node_meta_str(node.metadata)
+                lines.append(f'{idx}|{coords}|{ctrl}|{name}|[action: {action}]{meta}')
+        return "\n".join(lines)
 
 
 @dataclass
@@ -257,6 +278,7 @@ class ScrollElementNode:
 @dataclass
 class TextElementNode:
     text: str
+    window_name: str = ""
 
 
 ElementNode = TreeElementNode | ScrollElementNode | TextElementNode
