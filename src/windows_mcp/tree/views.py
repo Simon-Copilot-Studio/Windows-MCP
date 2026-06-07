@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -160,6 +161,7 @@ class TreeState:
     interactive_nodes: list["TreeElementNode"] = field(default_factory=list)
     scrollable_nodes: list["ScrollElementNode"] = field(default_factory=list)
     dom_informative_nodes: list["TextElementNode"] = field(default_factory=list)
+    ordered_nodes: list = field(default_factory=list)
     capture_sec: float = 0.0
     semantic_tree_root: "SemanticNode | None" = None
 
@@ -179,6 +181,24 @@ class TreeState:
         if not self.scrollable_nodes:
             return "No scrollable elements"
         return _render_tree(self.scrollable_nodes, _scroll_meta_str)
+
+    def ui_context_to_string(self) -> str:
+        """Render interactive and text nodes interleaved in document order.
+
+        Text nodes appear as [text], interactive nodes as id|window|ctrl|name|coords|metadata.
+        """
+        if not self.ordered_nodes:
+            return "No elements"
+        node_to_idx = {id(node): idx for idx, node in enumerate(self.interactive_nodes or [])}
+        rows = []
+        for node in self.ordered_nodes:
+            if isinstance(node, TextElementNode):
+                rows.append(f"[{node.text}]")
+            else:
+                idx = node_to_idx.get(id(node), "?")
+                row = f"{idx}|{node.window_name}|{node.control_type}|{node.name}|{node.center.to_string()}|{json.dumps(node.metadata)}"
+                rows.append(row)
+        return "\n".join(rows)
 
 
 @dataclass
@@ -257,6 +277,7 @@ class ScrollElementNode:
 @dataclass
 class TextElementNode:
     text: str
+    window_name: str = ""
 
 
 ElementNode = TreeElementNode | ScrollElementNode | TextElementNode
