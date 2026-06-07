@@ -289,14 +289,16 @@ class Tree:
                     except Exception:
                         pass
 
-                dom_interactive_nodes.append(TreeElementNode(**{
-                    'name':child.Name.strip(),
-                    'control_type':node.CachedLocalizedControlType,
-                    'bounding_box':bounding_box,
-                    'center':center,
-                    'window_name':window_name,
-                    'metadata':metadata
-                }))
+                child_name = child.Name.strip()
+                if child_name:
+                    dom_interactive_nodes.append(TreeElementNode(**{
+                        'name':child_name,
+                        'control_type':node.CachedLocalizedControlType,
+                        'bounding_box':bounding_box,
+                        'center':center,
+                        'window_name':window_name,
+                        'metadata':metadata
+                    }))
         elif self.element_has_child_element(node,'link','heading'):
             dom_interactive_nodes.pop()
             # child from GetFirstChildControl() is NOT cached — use live access
@@ -309,14 +311,16 @@ class Tree:
             is_focused=node.HasKeyboardFocus
             metadata:dict[str,Any]={}
             metadata['has_focused']=is_focused
-            dom_interactive_nodes.append(TreeElementNode(**{
-                'name':node.Name.strip(),
-                'control_type':control_type,
-                'bounding_box':bounding_box,
-                'center':center,
-                'window_name':window_name,
-                'metadata':metadata
-            }))
+            node_name = node.Name.strip()
+            if node_name:
+                dom_interactive_nodes.append(TreeElementNode(**{
+                    'name':node_name,
+                    'control_type':control_type,
+                    'bounding_box':bounding_box,
+                    'center':center,
+                    'window_name':window_name,
+                    'metadata':metadata
+                }))
 
 
     def tree_traversal(self, node: Control, window_bounding_box:Rect, window_name:str, is_browser:bool,
@@ -572,8 +576,9 @@ class Tree:
                                     'window_name':window_name,
                                     'metadata':metadata
                                 })
-                                dom_interactive_nodes.append(tree_node)
-                                self._dom_correction(node, dom_interactive_nodes, window_name)
+                                if name and name.strip():
+                                    dom_interactive_nodes.append(tree_node)
+                                    self._dom_correction(node, dom_interactive_nodes, window_name)
                             else:
                                 bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
                                 center = bounding_box.get_center()
@@ -585,18 +590,19 @@ class Tree:
                                     'window_name':window_name,
                                     'metadata':metadata
                                 })
-                                interactive_nodes.append(tree_node)
-                                if current_semantic_node is not None:
-                                    current_semantic_node.add_child(SemanticNode(
-                                        control_type=tree_node.control_type,
-                                        element_type='interactive',
-                                        name=tree_node.name,
-                                        window_name=tree_node.window_name,
-                                        center=tree_node.center,
-                                        bounding_box=tree_node.bounding_box,
-                                        metadata=dict(tree_node.metadata),
-                                    ))
-                                    semantic_added = True
+                                if name and name.strip():
+                                    interactive_nodes.append(tree_node)
+                                    if current_semantic_node is not None:
+                                        current_semantic_node.add_child(SemanticNode(
+                                            control_type=tree_node.control_type,
+                                            element_type='interactive',
+                                            name=tree_node.name,
+                                            window_name=tree_node.window_name,
+                                            center=tree_node.center,
+                                            bounding_box=tree_node.bounding_box,
+                                            metadata=dict(tree_node.metadata),
+                                        ))
+                                        semantic_added = True
 
                     # Informative Check
                     if dom_informative_nodes is not None:
@@ -762,29 +768,29 @@ class Tree:
                         width=window_bounding_box.width(),
                         height=window_bounding_box.height(),
                     )
-                    ia2_t0 = perf_counter()
-                    ia2_result = ia2_traversal.traverse_window(
-                        hwnd=handle,
-                        window_name=window_name,
-                        window_bounding_box=window_box,
-                    )
-                    ia2_ms = (perf_counter() - ia2_t0) * 1000
-                    if ia2_result:
-                        dom_interactive_nodes.extend(ia2_result.interactive_nodes)
-                        dom_informative_nodes.extend(ia2_result.informative_nodes)
-                        # Pin the bbox to the FIRST Firefox window walked (the active
-                        # one — it's first in windows_handles). Subsequent windows
-                        # contribute nodes but mustn't clobber the active window's bbox.
-                        if not self.dom_is_ia2:
-                            self.dom_bounding_box = ia2_result.dom_bounding_box or window_box
-                            self.dom_is_ia2 = True
-                        logger.info(
-                            "IA2 fallback for '%s' produced %d interactive / %d informative nodes in %.1fms",
-                            window_name,
-                            len(ia2_result.interactive_nodes),
-                            len(ia2_result.informative_nodes),
-                            ia2_ms,
-                        )
+                    # ia2_t0 = perf_counter()
+                    # ia2_result = ia2_traversal.traverse_window(
+                    #     hwnd=handle,
+                    #     window_name=window_name,
+                    #     window_bounding_box=window_box,
+                    # )
+                    # ia2_ms = (perf_counter() - ia2_t0) * 1000
+                    # if ia2_result:
+                    #     dom_interactive_nodes.extend(ia2_result.interactive_nodes)
+                    #     dom_informative_nodes.extend(ia2_result.informative_nodes)
+                    #     # Pin the bbox to the FIRST Firefox window walked (the active
+                    #     # one — it's first in windows_handles). Subsequent windows
+                    #     # contribute nodes but mustn't clobber the active window's bbox.
+                    #     if not self.dom_is_ia2:
+                    #         self.dom_bounding_box = ia2_result.dom_bounding_box or window_box
+                    #         self.dom_is_ia2 = True
+                    #     logger.info(
+                    #         "IA2 fallback for '%s' produced %d interactive / %d informative nodes in %.1fms",
+                    #         window_name,
+                    #         len(ia2_result.interactive_nodes),
+                    #         len(ia2_result.informative_nodes),
+                    #         ia2_ms,
+                    #     )
                 except Exception as e:
                     logger.warning("IA2 fallback failed for '%s' (handle %#x): %s", window_name, handle, e)
 
