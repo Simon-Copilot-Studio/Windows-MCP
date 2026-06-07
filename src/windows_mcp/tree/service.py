@@ -663,7 +663,12 @@ class Tree:
             for child in (children if is_dom else reversed(children)):
                 try:
                     # Check if the child is a DOM element
-                    if is_browser and child.CachedAutomationId=="RootWebArea":
+                    try:
+                        automation_id = child.CachedAutomationId
+                    except COMError:
+                        automation_id = None
+
+                    if is_browser and automation_id=="RootWebArea":
                         bounding_box=child.CachedBoundingRectangle
                         self.dom_bounding_box=BoundingBox(left=bounding_box.left,top=bounding_box.top,
                         right=bounding_box.right,bottom=bounding_box.bottom,width=bounding_box.width(),
