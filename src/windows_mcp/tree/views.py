@@ -201,35 +201,45 @@ class TreeState:
                 else:
                     non_dom_nodes.append(node)
 
-        # Display non-DOM first, then DOM
         lines = []
-        for node in non_dom_nodes:
-            if isinstance(node, TextElementNode):
-                lines.append(f"[{node.text}]")
-            else:
-                idx = node_to_idx.get(id(node))
-                if not idx:
-                    continue
-                coords = node.center.to_string()
-                ctrl = node.control_type.lower()
-                name = node.name
-                action = _action_for(ctrl)
-                meta = _node_meta_str(node.metadata)
-                lines.append(f'{idx}|{coords}|{ctrl}|{name}|[action: {action}]{meta}')
 
-        for node in dom_nodes:
-            if isinstance(node, TextElementNode):
-                lines.append(f"[{node.text}]")
-            else:
-                idx = node_to_idx.get(id(node))
-                if not idx:
-                    continue
-                coords = node.center.to_string()
-                ctrl = node.control_type.lower()
-                name = node.name
-                action = _action_for(ctrl)
-                meta = _node_meta_str(node.metadata)
-                lines.append(f'{idx}|{coords}|{ctrl}|{name}|[action: {action}]{meta}')
+        # Render non-DOM elements section
+        if non_dom_nodes:
+            lines.append("Non-DOM Elements:")
+            for i, node in enumerate(non_dom_nodes):
+                is_last = (i == len(non_dom_nodes) - 1) and not dom_nodes
+                connector = "└──" if is_last else "├──"
+                if isinstance(node, TextElementNode):
+                    lines.append(f"{connector} [{node.text}]")
+                else:
+                    idx = node_to_idx.get(id(node))
+                    if idx is None:
+                        continue
+                    coords = node.center.to_string()
+                    ctrl = node.control_type.lower()
+                    name = node.name
+                    action = _action_for(ctrl)
+                    meta = _node_meta_str(node.metadata)
+                    lines.append(f'{connector} {idx}|{coords} {ctrl} "{name}"  [action: {action}]{meta}')
+
+        # Render DOM elements section
+        if dom_nodes:
+            lines.append("DOM Elements:")
+            for i, node in enumerate(dom_nodes):
+                is_last = i == len(dom_nodes) - 1
+                connector = "└──" if is_last else "├──"
+                if isinstance(node, TextElementNode):
+                    lines.append(f"{connector} [{node.text}]")
+                else:
+                    idx = node_to_idx.get(id(node))
+                    if idx is None:
+                        continue
+                    coords = node.center.to_string()
+                    ctrl = node.control_type.lower()
+                    name = node.name
+                    action = _action_for(ctrl)
+                    meta = _node_meta_str(node.metadata)
+                    lines.append(f'{connector} {idx}|{coords} {ctrl} "{name}"  [action: {action}]{meta}')
 
         return "\n".join(lines)
 
