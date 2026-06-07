@@ -82,34 +82,19 @@ INFORMATIVE_CONTROL_TYPE_NAMES = set(
 
 TEXT_CONTROL_TYPE_NAMES = set(["TextControl", "ImageControl"])
 
+# Control types whose child TextControl carries their own label, not independent UI context.
+# Text children of these are skipped when building ordered_nodes.
 TEXT_OWNING_CONTROL_TYPE_NAMES = set([
     "ButtonControl",
+    "HyperlinkControl",
     "CheckBoxControl",
     "RadioButtonControl",
-    "MenuItemControl",
-    "TabItemControl",
-    "HyperlinkControl",
-    "ComboBoxControl",
-    "EditControl",
     "ListItemControl",
-    "HeaderItemControl",
+    "TabItemControl",
+    "MenuItemControl",
     "TreeItemControl",
-    "DataItemControl",
 ])
 
 DEFAULT_ACTIONS = set(["Click", "Press", "Jump", "Check", "Uncheck", "Double Click"])
-
-# Control types whose child TextControl carries their own label, not independent UI context.
-# Text children of these are skipped when building ordered_nodes.
-TEXT_OWNING_CONTROL_TYPE_NAMES = {
-    "ButtonControl",
-    "HyperlinkControl",
-    "CheckBoxControl",
-    "RadioButtonControl",
-    "ListItemControl",
-    "TabItemControl",
-    "MenuItemControl",
-    "TreeItemControl",
-}
 
 THREAD_MAX_RETRIES = 3
