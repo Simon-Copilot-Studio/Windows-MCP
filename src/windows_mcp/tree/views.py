@@ -186,28 +186,36 @@ class TreeState:
             return "No UI context"
         node_to_idx = {id(node): idx for idx, node in enumerate(self.interactive_nodes)}
 
-        # Separate DOM and non-DOM elements
-        non_dom_nodes = []
-        dom_nodes = []
+        # Group nodes by window
+        windows: dict[str, list] = {}
         for node in self.ordered_nodes:
-            if isinstance(node, TextElementNode):
-                if node.is_dom:
-                    dom_nodes.append(node)
-                else:
-                    non_dom_nodes.append(node)
-            else:
-                if node.is_dom:
-                    dom_nodes.append(node)
-                else:
-                    non_dom_nodes.append(node)
+            window_name = node.window_name if hasattr(node, "window_name") else ""
+            windows.setdefault(window_name, []).append(node)
 
         lines = []
+        for window_name, window_nodes in windows.items():
+            lines.append(f'window "{window_name}"')
 
-        # Render non-DOM elements section
-        if non_dom_nodes:
-            lines.append("Non-DOM Elements:")
-            for i, node in enumerate(non_dom_nodes):
-                is_last = (i == len(non_dom_nodes) - 1) and not dom_nodes
+            # Separate DOM and non-DOM elements within this window
+            non_dom_nodes = []
+            dom_nodes = []
+            for node in window_nodes:
+                if isinstance(node, TextElementNode):
+                    if node.is_dom:
+                        dom_nodes.append(node)
+                    else:
+                        non_dom_nodes.append(node)
+                else:
+                    if node.is_dom:
+                        dom_nodes.append(node)
+                    else:
+                        non_dom_nodes.append(node)
+
+            # Combine both lists for rendering
+            all_nodes = non_dom_nodes + dom_nodes
+
+            for i, node in enumerate(all_nodes):
+                is_last = i == len(all_nodes) - 1
                 connector = "└──" if is_last else "├──"
                 if isinstance(node, TextElementNode):
                     lines.append(f"{connector} [{node.text}]")
@@ -222,26 +230,9 @@ class TreeState:
                     meta = _node_meta_str(node.metadata)
                     lines.append(f'{connector} {idx}|{coords} {ctrl} "{name}"  [action: {action}]{meta}')
 
-        # Render DOM elements section
-        if dom_nodes:
-            lines.append("DOM Elements:")
-            for i, node in enumerate(dom_nodes):
-                is_last = i == len(dom_nodes) - 1
-                connector = "└──" if is_last else "├──"
-                if isinstance(node, TextElementNode):
-                    lines.append(f"{connector} [{node.text}]")
-                else:
-                    idx = node_to_idx.get(id(node))
-                    if idx is None:
-                        continue
-                    coords = node.center.to_string()
-                    ctrl = node.control_type.lower()
-                    name = node.name
-                    action = _action_for(ctrl)
-                    meta = _node_meta_str(node.metadata)
-                    lines.append(f'{connector} {idx}|{coords} {ctrl} "{name}"  [action: {action}]{meta}')
+            lines.append("")
 
-        return "\n".join(lines)
+        return "\n".join(lines).rstrip()
 
 
 @dataclass
