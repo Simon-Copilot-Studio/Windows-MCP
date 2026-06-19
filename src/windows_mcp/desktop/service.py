@@ -798,45 +798,78 @@ class Desktop:
             handles.add(secondary_taskbar_hwnd)
         return handles
 
+    # Tuned retry envelope for transient UIA empty results. The OS
+    # briefly returns NULL from GetForegroundWindow during focus
+    # transitions, app launches, and notification overlays — three
+    # attempts at 100 ms each covers the typical race without
+    # noticeably slowing the snapshot path when state is steady.
+    _UIA_RETRIES = 3
+    _UIA_RETRY_SLEEP_MS = 100
+
     def get_active_window(self, windows: list[Window] | None = None) -> Window | None:
-        try:
-            if windows is None:
-                windows, _ = self.get_windows()
-            active_window = self.get_foreground_window()
-            if active_window.ClassName == "Progman":
-                return None
-            active_window_handle = active_window.NativeWindowHandle
-            for window in windows:
-                if window.handle != active_window_handle:
+        """Return the foreground app window, retrying briefly on transient
+        empty results.
+
+        GetForegroundWindow can return NULL during focus transitions, app
+        launches, and notification-overlay flicker — even when there is a
+        visible focused window on screen. Without a retry, Snapshot
+        reports "No active window found" and the caller is left blind.
+        """
+        last_error = None
+        for attempt in range(self._UIA_RETRIES):
+            try:
+                if windows is None:
+                    windows, _ = self.get_windows()
+                active_window = self.get_foreground_window()
+                if active_window is None:
+                    # NULL foreground — retry, this often clears on the
+                    # next pass once whatever was transitioning settles.
+                    sleep(self._UIA_RETRY_SLEEP_MS / 1000.0)
                     continue
-                return window
-            # In case active window is not present in the windows list
-            return Window(
-                **{
-                    "name": active_window.Name,
-                    "is_browser": self.is_window_browser(active_window),
-                    "depth": 0,
-                    "bounding_box": BoundingBox(
-                        left=active_window.BoundingRectangle.left,
-                        top=active_window.BoundingRectangle.top,
-                        right=active_window.BoundingRectangle.right,
-                        bottom=active_window.BoundingRectangle.bottom,
-                        width=active_window.BoundingRectangle.width(),
-                        height=active_window.BoundingRectangle.height(),
-                    ),
-                    "status": self.get_window_status(active_window),
-                    "handle": active_window_handle,
-                    "process_id": active_window.ProcessId,
-                }
-            )
-        except Exception as ex:
-            logger.error(f"Error in get_active_window: {ex}")
+                if active_window.ClassName == "Progman":
+                    return None
+                active_window_handle = active_window.NativeWindowHandle
+                for window in windows:
+                    if window.handle != active_window_handle:
+                        continue
+                    return window
+                # In case active window is not present in the windows list
+                return Window(
+                    **{
+                        "name": active_window.Name,
+                        "is_browser": self.is_window_browser(active_window),
+                        "depth": 0,
+                        "bounding_box": BoundingBox(
+                            left=active_window.BoundingRectangle.left,
+                            top=active_window.BoundingRectangle.top,
+                            right=active_window.BoundingRectangle.right,
+                            bottom=active_window.BoundingRectangle.bottom,
+                            width=active_window.BoundingRectangle.width(),
+                            height=active_window.BoundingRectangle.height(),
+                        ),
+                        "status": self.get_window_status(active_window),
+                        "handle": active_window_handle,
+                        "process_id": active_window.ProcessId,
+                    }
+                )
+            except Exception as ex:
+                last_error = ex
+                # Same retry policy for transient exceptions —
+                # ControlFromHandle(NULL) raises during focus transitions
+                # and the next attempt usually succeeds.
+                sleep(self._UIA_RETRY_SLEEP_MS / 1000.0)
+                continue
+        if last_error is not None:
+            logger.error(f"Error in get_active_window after {self._UIA_RETRIES} retries: {last_error}")
         return None
 
-    def get_foreground_window(self) -> uia.Control:
+    def get_foreground_window(self) -> uia.Control | None:
         handle = uia.GetForegroundWindow()
-        active_window = self.get_window_from_element_handle(handle)
-        return active_window
+        # NULL handle means no window has foreground focus right now —
+        # don't pass that into ControlFromHandle, which would raise.
+        if not handle:
+            return None
+        return self.get_window_from_element_handle(handle)
 
     def get_window_from_element_handle(self, element_handle: int) -> uia.Control:
         current = uia.ControlFromHandle(element_handle)
