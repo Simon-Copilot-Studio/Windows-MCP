@@ -650,6 +650,16 @@ class Desktop:
                 for _ in range(clicks):
                     uia.MiddleClick(x, y)
 
+    # Strings longer than this typed via clipboard paste instead of
+    # per-key SendKeys. SendKeys at high cadence loses keystrokes on
+    # slower / loaded systems (Win11 VMs in particular) — observed
+    # "hello from windows-mcp drive test" rendering as
+    # "hello tttttttttttttttttttttttttt" on a 4-core Win11 VM. The
+    # paste path is reliable because it bypasses the scan-code queue
+    # entirely. Plain-text only; control chars route through SendKeys
+    # so escape sequences ({Enter}, {Tab}, …) still work.
+    _LONG_TEXT_PASTE_THRESHOLD = 20
+
     def type(
         self,
         loc: tuple[int, int],
@@ -668,10 +678,40 @@ class Desktop:
             sleep(0.5)
             uia.SendKeys("{Ctrl}a", waitTime=0.05)
             uia.SendKeys("{Back}", waitTime=0.05)
-        escaped_text = _escape_text_for_sendkeys(text)
-        uia.SendKeys(escaped_text, interval=0.02, waitTime=0.05)
+        # Per-key SendKeys for short text (so escape sequences keep working);
+        # clipboard paste for long text (so the scan-code queue can't race).
+        has_control_chars = any(c in text for c in ("\n", "\t", "{", "}"))
+        if len(text) >= self._LONG_TEXT_PASTE_THRESHOLD and not has_control_chars:
+            self._paste_text(text)
+        else:
+            escaped_text = _escape_text_for_sendkeys(text)
+            # Bump interval from 0.02 → 0.04. Keeps short-text speed acceptable
+            # while reducing key-loss on slower systems.
+            uia.SendKeys(escaped_text, interval=0.04, waitTime=0.05)
         if press_enter is True or (isinstance(press_enter, str) and press_enter.lower() == "true"):
             uia.SendKeys("{Enter}", waitTime=0.05)
+
+    def _paste_text(self, text: str):
+        """Stash text on the clipboard, Ctrl+V, restore prior clipboard.
+        Plain-text only — control chars (newlines, tabs, braces) need to
+        route through SendKeys instead so escape sequences are honored.
+        """
+        prior = None
+        try:
+            prior = uia.GetClipboardText()
+        except Exception:
+            pass
+        uia.SetClipboardText(text)
+        # Tiny pause so the OS clipboard write settles before Ctrl+V reads.
+        sleep(0.05)
+        uia.SendKeys("{Ctrl}v", waitTime=0.05)
+        # Restore prior clipboard so we don't surprise other tools.
+        if prior is not None:
+            sleep(0.05)
+            try:
+                uia.SetClipboardText(prior)
+            except Exception:
+                pass
 
     def scroll(
         self,
