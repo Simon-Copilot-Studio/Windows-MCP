@@ -16,6 +16,7 @@ from windows_mcp.tree.service import Tree
 from windows_mcp.desktop import screenshot as screenshot_capture
 from windows_mcp.desktop import flash_overlay
 from windows_mcp.infrastructure import validate_url
+from urllib.parse import urljoin
 from locale import getpreferredencoding
 from typing import Literal
 from markdownify import markdownify
@@ -792,16 +793,26 @@ class Desktop:
             self.type((x, y), text=text, clear=True)
 
     def scrape(self, url: str) -> str:
-        validate_url(url)
+        current_url = url
         try:
-            response = requests.get(url, timeout=10)
+            for _ in range(5):
+                validate_url(current_url)
+                response = requests.get(current_url, timeout=10, allow_redirects=False)
+                if not response.is_redirect:
+                    break
+                location = response.headers.get("Location")
+                if not location:
+                    raise ValueError(f"Redirect from {current_url} has no Location header")
+                current_url = urljoin(current_url, location)
+            else:
+                raise ValueError("Too many redirects while fetching URL")
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            raise ValueError(f"HTTP error for {url}: {e}") from e
+            raise ValueError(f"HTTP error for {current_url}: {e}") from e
         except requests.exceptions.ConnectionError as e:
-            raise ConnectionError(f"Failed to connect to {url}: {e}") from e
+            raise ConnectionError(f"Failed to connect to {current_url}: {e}") from e
         except requests.exceptions.Timeout as e:
-            raise TimeoutError(f"Request timed out for {url}: {e}") from e
+            raise TimeoutError(f"Request timed out for {current_url}: {e}") from e
         html = response.text
         content = markdownify(html=html)
         return content
