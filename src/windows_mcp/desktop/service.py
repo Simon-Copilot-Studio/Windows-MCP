@@ -8,8 +8,8 @@ from windows_mcp.vdm.core import (
     get_current_desktop,
     is_window_on_current_desktop,
 )
-from windows_mcp.desktop.views import DesktopState, Window, Browser, Status, Size
-from windows_mcp.tree.views import BoundingBox, TreeElementNode, TreeState
+from windows_mcp.desktop.views import DesktopState, Window, Browser, Status, Size, Display
+from windows_mcp.tree.views import BoundingBox, TreeElementNode, TreeState, SemanticNode
 from concurrent.futures import ThreadPoolExecutor
 from PIL import ImageFont, ImageDraw, Image
 from windows_mcp.tree.service import Tree
@@ -118,7 +118,11 @@ class Desktop:
         screenshot_capture_ms = 0.0
         screenshot_resize_ms = 0.0
         state_build_ms = 0.0
-        capture_rect = self.get_display_union_rect(display_indices) if display_indices else None
+        displays = self.get_displays()
+        available_displays = [self._display_to_view(display) for display in displays]
+        capture_rect = (
+            self.get_display_union_rect(display_indices, displays) if display_indices else None
+        )
         screenshot_region = self._rect_to_bounding_box(capture_rect) if capture_rect else None
 
         # Fast path for Screenshot tool (use_ui_tree=False): skip window enumeration.
@@ -159,9 +163,24 @@ class Desktop:
         logger.debug(f"Windows: {windows}")
 
         if use_ui_tree:
-            other_windows_handles = list(controls_handles - windows_handles)
+            other_windows_handles = set(controls_handles - windows_handles)
+            if active_window_handle is not None:
+                other_windows_handles.discard(active_window_handle)
+            tree_active_window_handle = active_window_handle
+            if screenshot_region:
+                active_window_in_region = (
+                    self._filter_window_to_region(active_window, screenshot_region) is not None
+                )
+                tree_active_window_handle = (
+                    active_window_handle if active_window_in_region else None
+                )
+                other_windows_handles.update(
+                    window.handle
+                    for window in windows
+                    if self._filter_window_to_region(window, screenshot_region) is not None
+                )
             tree_state = self.tree.get_state(
-                active_window_handle, other_windows_handles, use_dom=use_dom
+                tree_active_window_handle, list(other_windows_handles), use_dom=use_dom
             )
         else:
             root_box = screenshot_region or self.tree.screen_box
@@ -256,6 +275,7 @@ class Desktop:
             screenshot_scale=applied_scale,
             screenshot_region=screenshot_region,
             screenshot_displays=display_indices,
+            available_displays=available_displays,
             tree_state=tree_state,
             screenshot_backend=getattr(self, "_last_screenshot_backend", None)
             if use_vision
@@ -958,6 +978,17 @@ class Desktop:
         width, height = uia.GetVirtualScreenSize()
         return Size(width=width, height=height)
 
+    def get_screen_box(self) -> BoundingBox:
+        left, top, width, height = uia.GetVirtualScreenRect()
+        return BoundingBox(
+            left=left,
+            top=top,
+            right=left + width,
+            bottom=top + height,
+            width=width,
+            height=height,
+        )
+
     @staticmethod
     def parse_display_selection(
         display: int | list[int] | tuple[int, ...] | None,
@@ -967,7 +998,7 @@ class Desktop:
 
         if isinstance(display, bool):
             raise ValueError(
-                "display must be a JSON array of non-negative integers, for example [0] or [0,1]"
+                "display must be a JSON array of zero-based active display indices, for example [0] or [0,1]"
             )
 
         if isinstance(display, int):
@@ -976,37 +1007,56 @@ class Desktop:
             values = list(display)
         else:
             raise ValueError(
-                "display must be a JSON array of non-negative integers, for example [0] or [0,1]"
+                "display must be a JSON array of zero-based active display indices, for example [0] or [0,1]"
             )
 
         unique_values: list[int] = []
         for value in values:
             if not isinstance(value, int) or value < 0:
-                raise ValueError("display must contain only non-negative integers")
+                raise ValueError("display must contain only zero-based active display indices")
             if value not in unique_values:
                 unique_values.append(value)
         return unique_values or None
 
-    def get_display_union_rect(self, display_indices: list[int]) -> uia.Rect:
-        monitor_rects = uia.GetMonitorsRect()
-        if not monitor_rects:
+    @staticmethod
+    def get_displays() -> list[uia.DisplayInfo]:
+        return uia.GetDisplays()
+
+    @staticmethod
+    def _display_to_view(display: uia.DisplayInfo) -> Display:
+        return Display(
+            index=display.index,
+            device_name=display.device_name,
+            bounding_box=Desktop._rect_to_bounding_box(display.rect),
+            primary=display.primary,
+        )
+
+    def get_display_union_rect(
+        self,
+        display_indices: list[int],
+        displays: list[uia.DisplayInfo] | None = None,
+    ) -> uia.Rect:
+        displays = displays if displays is not None else self.get_displays()
+        if not displays:
             logger.warning(
                 "Monitor enumeration returned no monitors while display filter was requested"
             )
             raise ValueError("No displays detected")
 
-        invalid_indices = [index for index in display_indices if index >= len(monitor_rects)]
+        display_by_index = {display.index: display for display in displays}
+        invalid_indices = [index for index in display_indices if index not in display_by_index]
         if invalid_indices:
+            available_indices = ",".join(str(display.index) for display in displays)
             logger.warning(
-                "Invalid display selection %s. Available displays: 0-%s",
+                "Invalid display selection %s. Available displays: %s",
                 invalid_indices,
-                len(monitor_rects) - 1,
+                available_indices,
             )
             raise ValueError(
-                f"Invalid display index {invalid_indices[0]}. Available displays: 0-{len(monitor_rects) - 1}"
+                f"Invalid display index {invalid_indices[0]}. Available displays: {available_indices}"
             )
 
-        selected_rects = [monitor_rects[index] for index in display_indices]
+        selected_rects = [display_by_index[index].rect for index in display_indices]
         return uia.Rect(
             left=min(rect.left for rect in selected_rects),
             top=min(rect.top for rect in selected_rects),
@@ -1231,6 +1281,41 @@ class Desktop:
             metadata=node.metadata,
         )
 
+    def _filter_semantic_node_to_region(
+        self,
+        node: SemanticNode | None,
+        region: BoundingBox,
+    ) -> SemanticNode | None:
+        if node is None:
+            return None
+
+        clipped_box = None
+        if node.bounding_box is not None:
+            clipped_box = self._clip_bounding_box_to_region(node.bounding_box, region)
+            if clipped_box is None:
+                return None
+
+        filtered_children = []
+        for child in node.children:
+            filtered_child = self._filter_semantic_node_to_region(child, region)
+            if filtered_child is not None:
+                filtered_children.append(filtered_child)
+
+        if node.element_type != "desktop" and clipped_box is None and not filtered_children:
+            return None
+
+        filtered_node = SemanticNode(
+            control_type=node.control_type,
+            element_type=node.element_type,
+            name=node.name,
+            window_name=node.window_name,
+            center=clipped_box.get_center() if clipped_box is not None else node.center,
+            bounding_box=clipped_box,
+            metadata=dict(node.metadata),
+        )
+        filtered_node.children = filtered_children
+        return filtered_node
+
     def _filter_tree_state_to_region(self, tree_state, region: BoundingBox):
         filtered_interactive_nodes = []
         for node in tree_state.interactive_nodes:
@@ -1248,6 +1333,14 @@ class Desktop:
         if tree_state.dom_node is not None:
             filtered_dom_node = self._filter_scroll_node_to_region(tree_state.dom_node, region)
 
+        filtered_semantic_root = self._filter_semantic_node_to_region(
+            tree_state.semantic_tree_root,
+            region,
+        )
+        if filtered_semantic_root is not None:
+            filtered_semantic_root.bounding_box = region
+            filtered_semantic_root.center = region.get_center()
+
         return tree_state.__class__(
             status=tree_state.status,
             root_node=TreeElementNode(
@@ -1263,4 +1356,5 @@ class Desktop:
             scrollable_nodes=filtered_scrollable_nodes,
             dom_informative_nodes=tree_state.dom_informative_nodes if filtered_dom_node else [],
             capture_sec=tree_state.capture_sec,
+            semantic_tree_root=filtered_semantic_root,
         )
