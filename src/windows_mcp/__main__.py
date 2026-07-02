@@ -199,6 +199,10 @@ def _build_mcp() -> FastMCP:
 
     _mcp = FastMCP(name="windows-mcp", instructions=instructions, lifespan=lifespan)
     register_all(_mcp, get_desktop=_get_desktop, get_analytics=_get_analytics)
+
+    from windows_mcp.indicator import ControlIndicatorMiddleware
+
+    _mcp.add_middleware(ControlIndicatorMiddleware())
     return _mcp
 
 
